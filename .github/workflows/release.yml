@@ -54,6 +54,20 @@ jobs:
           cp "target/release/nosignal${{ matrix.ext }}" \
              "gui/src-tauri/binaries/nosignal-${{ matrix.triple }}${{ matrix.ext }}"
 
+      # externalBin is injected only for release builds — keeping it out of
+      # the committed config lets plain `cargo check` / `tauri dev` work
+      # without staged sidecars (see the tauri-shell CI job).
+      - name: Add sidecars to bundle config
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          p = pathlib.Path("gui/src-tauri/tauri.conf.json")
+          cfg = json.loads(p.read_text())
+          cfg["bundle"]["externalBin"] = ["binaries/nosignald", "binaries/nosignal"]
+          p.write_text(json.dumps(cfg, indent=2))
+          PY
+
       # Builds the Tauri app, bundles installers (.deb/.rpm/AppImage on
       # Linux; .msi + NSIS .exe on Windows) and attaches everything to a
       # DRAFT GitHub release — publishing stays a manual decision.

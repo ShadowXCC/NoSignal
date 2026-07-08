@@ -7,7 +7,6 @@
 mod tray;
 
 use nosignal_ipc::types::{ProfilesInfo, SetOpts, SetOutcome, StatusInfo};
-use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -21,11 +20,6 @@ fn err_str(e: impl std::fmt::Display) -> String {
 
 async fn client() -> Result<Box<dyn nosignal_ipc::DaemonClient>, String> {
     nosignal_ipc::connect().await.map_err(err_str)
-}
-
-#[derive(Serialize, Clone)]
-struct OutputsPayload {
-    topology: nosignal_core::Topology,
 }
 
 #[tauri::command]
@@ -217,7 +211,7 @@ fn register_windows_hotkeys(app: &AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -230,9 +224,7 @@ pub fn run() {
         ));
 
     #[cfg(target_os = "windows")]
-    {
-        builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
-    }
+    let builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
 
     builder
         .manage(AppState {

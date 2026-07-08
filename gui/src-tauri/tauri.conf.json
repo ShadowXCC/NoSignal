@@ -27,7 +27,6 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "externalBin": ["binaries/nosignald", "binaries/nosignal"],
     "linux": {
       "deb": {
         "files": {
