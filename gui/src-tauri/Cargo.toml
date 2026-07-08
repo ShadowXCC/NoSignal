@@ -3,7 +3,8 @@ name = "nosignal-gui"
 version = "0.1.0"
 description = "NoSignal GUI — thin Tauri client for the NoSignal daemon."
 license = "AGPL-3.0-only"
-edition = "2021"
+edition = "2024"
+rust-version = "1.88"
 
 [lib]
 # The `_lib` suffix avoids a lib/bin name conflict on Windows.
