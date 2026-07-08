@@ -14,6 +14,10 @@ pub struct DaemonConfig {
     pub revert_secs: u64,
     #[serde(default)]
     pub aliases: Vec<AliasEntry>,
+    /// Outputs opted in to DDC/CI instant standby on disable (per-output
+    /// opt-in because DDC/CI is a per-path capability lottery).
+    #[serde(default)]
+    pub ddc: Vec<AliasEntry>,
 }
 
 fn default_revert_secs() -> u64 {
@@ -45,6 +49,7 @@ impl DaemonConfig {
             .unwrap_or_else(|| Self {
                 revert_secs: default_revert_secs(),
                 aliases: Vec::new(),
+                ddc: Vec::new(),
             })
     }
 
@@ -71,6 +76,26 @@ impl DaemonConfig {
                     break;
                 }
             }
+        }
+    }
+
+    /// Whether this output is opted in to DDC/CI standby (EDID-first match).
+    pub fn ddc_enabled(&self, identity: &OutputIdentity) -> bool {
+        self.ddc
+            .iter()
+            .any(|e| identity.match_quality(&e.identity()) > MatchQuality::None)
+    }
+
+    /// Opt an output in or out of DDC/CI standby.
+    pub fn set_ddc(&mut self, identity: &OutputIdentity, enabled: bool) {
+        self.ddc
+            .retain(|e| identity.match_quality(&e.identity()) == MatchQuality::None);
+        if enabled {
+            self.ddc.push(AliasEntry {
+                name: String::new(),
+                edid: identity.edid.clone(),
+                connector: identity.connector.clone(),
+            });
         }
     }
 

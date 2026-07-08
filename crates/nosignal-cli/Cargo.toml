@@ -15,6 +15,7 @@ path = "src/main.rs"
 nosignal-core = { workspace = true }
 nosignald = { path = "../nosignald" }
 nosignal-ipc = { workspace = true }
+nosignal-ddc = { workspace = true }
 clap = { workspace = true }
 tokio = { workspace = true }
 serde_json = { workspace = true }

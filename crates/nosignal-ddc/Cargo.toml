@@ -8,3 +8,9 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+nosignal-core = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[target.'cfg(any(target_os = "linux", target_os = "windows"))'.dependencies]
+ddc-hi = "0.4"

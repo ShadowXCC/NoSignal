@@ -16,7 +16,7 @@ Every OS *can* deactivate a display, but the experience is buried, inconsistent,
 - **Robust display identity:** displays are matched by EDID first (survives replugging into a different port), connector name as fallback, with explicit warnings on ambiguity — never a guess.
 - **Audio follow-through:** if the disabled output was the HDMI/DP audio sink, the default sink fails over and is restored on re-enable.
 - **Safety nets:** disabling the last active display (or a laptop's internal panel) always arms a timed auto-revert, like OS resolution changes.
-- **DDC/CI instant sleep (opt-in):** tell capable monitors to power down immediately instead of waiting for their no-signal timer.
+- **DDC/CI instant sleep (opt-in):** tell capable monitors to power down immediately instead of waiting for their no-signal timer — `nosignal ddc probe <target>` to test, `nosignal ddc opt-in <target>` to enable. Wake is always "re-enable the output"; NoSignal never DDC-wakes.
 
 ## Platform support
 

@@ -346,6 +346,61 @@ async fn revert_flow(
     Ok(())
 }
 
+// ------------------------------------------------------------ DDC/CI
+
+/// DDC/CI instant-standby management. Probing talks to the monitor directly;
+/// opt-in/out edits the daemon config (restart the daemon to apply).
+pub mod ddc {
+    use super::*;
+    use nosignald::config::DaemonConfig;
+
+    async fn resolve(target: &str) -> Result<Output, CliError> {
+        let backend = select::detect().await?;
+        let topo = backend.snapshot().await?;
+        Ok(resolve_target(target, &topo.outputs)?.clone())
+    }
+
+    pub async fn probe(target: &str) -> Result<(), CliError> {
+        let output = resolve(target).await?;
+        let identity = output.identity.clone();
+        let result = tokio::task::spawn_blocking(move || nosignal_ddc::probe(&identity))
+            .await
+            .map_err(|e| CliError::Other(e.to_string()))?;
+        match result {
+            Ok(info) => {
+                println!(
+                    "{}: DDC/CI power control works (current power mode {}, via {})",
+                    output.identity.connector, info.current_power, info.via
+                );
+                println!("opt in with: nosignal ddc opt-in {target}");
+                Ok(())
+            }
+            Err(e) => Err(CliError::Other(format!(
+                "{}: {e}\nnote: DDC/CI often breaks through docks, adapters, MST hubs \
+                 and KVMs, and TVs generally don't support it",
+                output.identity.connector
+            ))),
+        }
+    }
+
+    pub async fn set_opt_in(target: &str, enabled: bool) -> Result<(), CliError> {
+        let output = resolve(target).await?;
+        let path = paths::config_dir().join("config.toml");
+        let mut config = DaemonConfig::load(&path);
+        config.set_ddc(&output.identity, enabled);
+        config
+            .save(&path)
+            .map_err(|e| CliError::Other(e.to_string()))?;
+        println!(
+            "{} DDC/CI standby for {} — restart the daemon to apply \
+             (nosignal daemon stop && nosignal daemon start)",
+            if enabled { "enabled" } else { "disabled" },
+            output.identity.connector
+        );
+        Ok(())
+    }
+}
+
 // ------------------------------------------------------ hotkeys fallback
 
 /// GNOME custom-keybinding fallback for environments without the

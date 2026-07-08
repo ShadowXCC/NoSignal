@@ -257,6 +257,10 @@ impl Engine {
         match timer_secs {
             Some(secs) => {
                 self.apply_with_rebase(&plan, ApplyMode::Temporary).await?;
+                if !want {
+                    // Instant panel sleep; a revert's returning signal wakes it.
+                    self.ddc_after_disable(&output).await;
+                }
                 let job_id = self
                     .begin_pending(
                         topo,
@@ -279,10 +283,29 @@ impl Engine {
                     self.audio_after_enable(&output).await;
                 } else {
                     self.audio_after_disable(&output).await;
+                    self.ddc_after_disable(&output).await;
                 }
                 Ok(SetOutcome::Applied { warnings: vec![] })
             }
         }
+    }
+
+    /// Instant panel standby via DDC/CI for opted-in outputs, right after a
+    /// disable. Failures are logged only — the no-signal timer still works.
+    /// The wake path is always "re-enable the output"; never DDC.
+    async fn ddc_after_disable(&self, output: &Output) {
+        let opted_in = {
+            let st = self.st.lock().await;
+            st.config.ddc_enabled(&output.identity)
+        };
+        if !opted_in {
+            return;
+        }
+        let identity = output.identity.clone();
+        tokio::task::spawn_blocking(move || match nosignal_ddc::standby(&identity) {
+            Ok(()) => tracing::info!("DDC/CI standby sent to {identity}"),
+            Err(e) => tracing::warn!("DDC/CI standby for {identity} failed: {e}"),
+        });
     }
 
     /// Store the output's current config so re-enable restores it exactly.
@@ -536,12 +559,15 @@ impl Engine {
 
         let (plan, warnings) = profile.to_plan(&topo)?;
 
-        // Remember configs of outputs this profile turns off.
+        // Remember configs of outputs this profile turns off, and note which
+        // ones get DDC/CI standby after the apply.
+        let mut turned_off: Vec<Output> = Vec::new();
         for planned in plan.outputs.iter().filter(|p| !p.enabled) {
             if let Some(live) = topo.find_connector(&planned.identity.connector)
                 && live.enabled
             {
                 self.remember_output(live).await;
+                turned_off.push(live.clone());
             }
         }
 
@@ -572,6 +598,11 @@ impl Engine {
                 }
             }
         };
+        if !matches!(outcome, SetOutcome::AlreadyInState) {
+            for output in &turned_off {
+                self.ddc_after_disable(output).await;
+            }
+        }
 
         {
             let mut st = self.st.lock().await;

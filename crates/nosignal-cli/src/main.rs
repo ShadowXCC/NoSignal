@@ -84,6 +84,11 @@ enum Cmd {
         #[command(subcommand)]
         cmd: HotkeysCmd,
     },
+    /// DDC/CI instant-standby (opt-in, per output)
+    Ddc {
+        #[command(subcommand)]
+        cmd: DdcCmd,
+    },
     /// Control the daemon process
     Daemon {
         #[command(subcommand)]
@@ -108,6 +113,16 @@ enum HotkeysCmd {
     /// Write GNOME custom keybindings that invoke this CLI (portal-free
     /// fallback; the daemon binds hotkeys via the desktop portal otherwise)
     Install,
+}
+
+#[derive(Subcommand)]
+enum DdcCmd {
+    /// Test whether the monitor answers DDC/CI power commands
+    Probe { target: String },
+    /// Send DDC/CI standby when this output is disabled
+    OptIn { target: String },
+    /// Stop sending DDC/CI standby for this output
+    OptOut { target: String },
 }
 
 #[derive(Subcommand)]
@@ -258,6 +273,12 @@ async fn run(cli: Cli) -> Result<(), ops::CliError> {
 
         (Cmd::Hotkeys { cmd }, _) => match cmd {
             HotkeysCmd::Install => ops::hotkeys::install().await,
+        },
+
+        (Cmd::Ddc { cmd }, _) => match cmd {
+            DdcCmd::Probe { target } => ops::ddc::probe(&target).await,
+            DdcCmd::OptIn { target } => ops::ddc::set_opt_in(&target, true).await,
+            DdcCmd::OptOut { target } => ops::ddc::set_opt_in(&target, false).await,
         },
 
         (Cmd::Daemon { .. }, _) => unreachable!("handled above"),
