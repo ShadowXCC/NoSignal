@@ -22,7 +22,7 @@ Every OS *can* deactivate a display, but the experience is buried, inconsistent,
 
 | Platform | Backend | Status |
 |---|---|---|
-| Linux / GNOME (Wayland & X11) | Mutter DisplayConfig DBus | planned (v1) |
+| Linux / GNOME (Wayland & X11) | Mutter DisplayConfig DBus | CLI working (daemon/GUI in progress) |
 | Linux / KDE Plasma | KScreen | planned (v1) |
 | Linux / wlroots (Sway, Hyprland, …) | `zwlr_output_manager_v1` | planned (v1) |
 | Linux / other X11 (XFCE, MATE, Cinnamon, …) | RandR | planned (v1) |

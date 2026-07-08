@@ -8,3 +8,9 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+nosignal-core = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

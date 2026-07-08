@@ -12,3 +12,9 @@ name = "nosignal"
 path = "src/main.rs"
 
 [dependencies]
+nosignal-core = { workspace = true }
+nosignald = { path = "../nosignald" }
+clap = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+futures = { workspace = true }
