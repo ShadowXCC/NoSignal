@@ -88,6 +88,176 @@ mod pactl {
     }
 }
 
+#[cfg(target_os = "windows")]
+pub use win::WindowsAudio;
+
+#[cfg(target_os = "windows")]
+// COM vtable methods must keep their canonical PascalCase names.
+#[allow(non_snake_case, clippy::too_many_arguments)]
+mod win {
+    use super::AudioController;
+    use windows::Win32::Media::Audio::{
+        DEVICE_STATE_ACTIVE, IMMDeviceEnumerator, MMDeviceEnumerator, eCommunications, eConsole,
+        eMultimedia, eRender,
+    };
+    use windows::Win32::System::Com::{
+        CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx,
+    };
+    use windows::core::{GUID, HSTRING, IUnknown, IUnknown_Vtbl, PCWSTR, interface};
+
+    /// Undocumented but industry-standard COM interface used by every
+    /// default-device switcher (SoundVolumeView, AudioSwitcher, EarTrumpet).
+    /// Only `SetDefaultEndpoint` is called; earlier vtable slots are declared
+    /// for layout and never used.
+    #[interface("f8679f50-850a-41cf-9c72-430f290290c8")]
+    unsafe trait IPolicyConfig: IUnknown {
+        unsafe fn GetMixFormat(
+            &self,
+            name: PCWSTR,
+            fmt: *mut *mut core::ffi::c_void,
+        ) -> windows::core::HRESULT;
+        unsafe fn GetDeviceFormat(
+            &self,
+            name: PCWSTR,
+            default: i32,
+            fmt: *mut *mut core::ffi::c_void,
+        ) -> windows::core::HRESULT;
+        unsafe fn ResetDeviceFormat(&self, name: PCWSTR) -> windows::core::HRESULT;
+        unsafe fn SetDeviceFormat(
+            &self,
+            name: PCWSTR,
+            endpoint: *mut core::ffi::c_void,
+            mix: *mut core::ffi::c_void,
+        ) -> windows::core::HRESULT;
+        unsafe fn GetProcessingPeriod(
+            &self,
+            name: PCWSTR,
+            default: i32,
+            def_period: *mut i64,
+            min_period: *mut i64,
+        ) -> windows::core::HRESULT;
+        unsafe fn SetProcessingPeriod(
+            &self,
+            name: PCWSTR,
+            period: *mut i64,
+        ) -> windows::core::HRESULT;
+        unsafe fn GetShareMode(
+            &self,
+            name: PCWSTR,
+            mode: *mut core::ffi::c_void,
+        ) -> windows::core::HRESULT;
+        unsafe fn SetShareMode(
+            &self,
+            name: PCWSTR,
+            mode: *mut core::ffi::c_void,
+        ) -> windows::core::HRESULT;
+        unsafe fn GetPropertyValue(
+            &self,
+            name: PCWSTR,
+            fx_store: i32,
+            key: *const core::ffi::c_void,
+            value: *mut core::ffi::c_void,
+        ) -> windows::core::HRESULT;
+        unsafe fn SetPropertyValue(
+            &self,
+            name: PCWSTR,
+            fx_store: i32,
+            key: *const core::ffi::c_void,
+            value: *mut core::ffi::c_void,
+        ) -> windows::core::HRESULT;
+        unsafe fn SetDefaultEndpoint(
+            &self,
+            name: PCWSTR,
+            role: windows::Win32::Media::Audio::ERole,
+        ) -> windows::core::HRESULT;
+        unsafe fn SetEndpointVisibility(
+            &self,
+            name: PCWSTR,
+            visible: i32,
+        ) -> windows::core::HRESULT;
+    }
+
+    const POLICY_CONFIG_CLIENT: GUID = GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9);
+
+    pub struct WindowsAudio;
+
+    impl WindowsAudio {
+        pub fn detect() -> Option<Self> {
+            let probe = WindowsAudio;
+            probe.enumerator().map(|_| probe)
+        }
+
+        fn enumerator(&self) -> Option<IMMDeviceEnumerator> {
+            unsafe {
+                // S_FALSE (already initialized) is fine.
+                let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+                CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).ok()
+            }
+        }
+    }
+
+    impl AudioController for WindowsAudio {
+        fn default_sink(&self) -> Option<String> {
+            let enumerator = self.enumerator()?;
+            unsafe {
+                let device = enumerator
+                    .GetDefaultAudioEndpoint(eRender, eMultimedia)
+                    .ok()?;
+                let id = device.GetId().ok()?;
+                let text = id.to_string().ok()?;
+                windows::Win32::System::Com::CoTaskMemFree(Some(id.as_ptr() as *const _));
+                Some(text)
+            }
+        }
+
+        fn set_default_sink(&self, sink: &str) -> bool {
+            unsafe {
+                let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+                let Ok(policy): windows::core::Result<IPolicyConfig> =
+                    CoCreateInstance(&POLICY_CONFIG_CLIENT, None, CLSCTX_ALL)
+                else {
+                    return false;
+                };
+                let wide = HSTRING::from(sink);
+                for role in [eConsole, eMultimedia, eCommunications] {
+                    if policy
+                        .SetDefaultEndpoint(PCWSTR(wide.as_ptr()), role)
+                        .is_err()
+                    {
+                        return false;
+                    }
+                }
+                true
+            }
+        }
+
+        fn has_sink(&self, sink: &str) -> bool {
+            let Some(enumerator) = self.enumerator() else {
+                return false;
+            };
+            unsafe {
+                let Ok(devices) = enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)
+                else {
+                    return false;
+                };
+                let count = devices.GetCount().unwrap_or(0);
+                for i in 0..count {
+                    if let Ok(device) = devices.Item(i)
+                        && let Ok(id) = device.GetId()
+                    {
+                        let matches = id.to_string().map(|s| s == sink).unwrap_or(false);
+                        windows::Win32::System::Com::CoTaskMemFree(Some(id.as_ptr() as *const _));
+                        if matches {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+        }
+    }
+}
+
 /// Test double recording calls.
 #[derive(Default)]
 pub struct FakeAudio {

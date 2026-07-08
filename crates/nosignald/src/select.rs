@@ -34,6 +34,8 @@ async fn by_name(name: &str) -> Result<Arc<dyn DisplayBackend>, BackendError> {
         )),
         #[cfg(target_os = "linux")]
         "x11" => Ok(Arc::new(nosignal_backend_x11::X11Backend::new().await?)),
+        #[cfg(target_os = "windows")]
+        "windows" => Ok(Arc::new(nosignal_backend_win::WindowsBackend::new().await?)),
         other => Err(BackendError::Unavailable(format!(
             "unknown backend '{other}' (NOSIGNAL_BACKEND)"
         ))),
@@ -94,10 +96,7 @@ async fn auto() -> Result<Arc<dyn DisplayBackend>, BackendError> {
 
 #[cfg(target_os = "windows")]
 async fn auto() -> Result<Arc<dyn DisplayBackend>, BackendError> {
-    // Windows CCD backend lands in M4.
-    Err(BackendError::Unavailable(
-        "the Windows backend arrives in M4 — set NOSIGNAL_BACKEND=mock to experiment".into(),
-    ))
+    Ok(Arc::new(nosignal_backend_win::WindowsBackend::new().await?))
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "windows")))]

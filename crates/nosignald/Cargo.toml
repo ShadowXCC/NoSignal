@@ -33,5 +33,18 @@ nosignal-backend-wlroots = { workspace = true }
 nosignal-backend-x11 = { workspace = true }
 zbus = { workspace = true }
 
+[target.'cfg(target_os = "windows")'.dependencies]
+nosignal-backend-win = { workspace = true }
+windows-core = "0.62"
+
+[target.'cfg(target_os = "windows")'.dependencies.windows]
+version = "0.62"
+features = [
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_System_Com",
+    "Win32_UI_Shell",
+]
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

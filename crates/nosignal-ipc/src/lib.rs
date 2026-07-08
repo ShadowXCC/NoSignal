@@ -8,6 +8,8 @@ pub mod types;
 
 #[cfg(target_os = "linux")]
 pub mod dbus_client;
+#[cfg(target_os = "windows")]
+pub mod pipe_client;
 
 use async_trait::async_trait;
 use thiserror::Error;
@@ -53,9 +55,14 @@ pub async fn connect() -> Result<Box<dyn DaemonClient>, IpcError> {
     Ok(Box::new(dbus_client::DbusClient::connect().await?))
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
+pub async fn connect() -> Result<Box<dyn DaemonClient>, IpcError> {
+    Ok(Box::new(pipe_client::PipeClient::connect().await?))
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 pub async fn connect() -> Result<Box<dyn DaemonClient>, IpcError> {
     Err(IpcError::Unreachable(
-        "no IPC transport for this platform yet (named pipes arrive in M4)".into(),
+        "no IPC transport for this platform".into(),
     ))
 }

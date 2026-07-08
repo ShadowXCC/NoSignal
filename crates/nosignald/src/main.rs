@@ -2,6 +2,7 @@
 
 use nosignald::audio::AudioController;
 use nosignald::engine::{Engine, EnginePaths};
+use nosignald::fullscreen::FullscreenOracle;
 use nosignald::select;
 use std::sync::Arc;
 
@@ -23,10 +24,15 @@ async fn main() {
     };
     tracing::info!("display backend: {}", backend.name());
 
-    let audio = detect_audio();
-    let engine = Engine::new(backend, audio, EnginePaths::default_locations());
+    let engine = Engine::with_oracle(
+        backend,
+        detect_audio(),
+        detect_oracle(),
+        EnginePaths::default_locations(),
+    );
     let shutdown = Arc::new(tokio::sync::Notify::new());
 
+    // Platform IPC. Claiming the name/pipe is also the single-instance lock.
     #[cfg(target_os = "linux")]
     let _connection = match nosignald::dbus::serve(engine.clone(), shutdown.clone()).await {
         Ok(c) => Some(c),
@@ -38,6 +44,19 @@ async fn main() {
         }
         Err(e) => {
             eprintln!("nosignald: cannot serve DBus: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    #[cfg(target_os = "windows")]
+    let _server = match nosignald::pipe::start(engine.clone(), shutdown.clone()) {
+        Ok(handle) => handle,
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+            eprintln!("nosignald: another instance already owns the pipe");
+            std::process::exit(0);
+        }
+        Err(e) => {
+            eprintln!("nosignald: cannot serve named pipe: {e}");
             std::process::exit(1);
         }
     };
@@ -70,5 +89,22 @@ fn detect_audio() -> Arc<dyn AudioController> {
         }
         tracing::info!("audio: pactl not found; audio follow-through disabled");
     }
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(win) = nosignald::audio::WindowsAudio::detect() {
+            tracing::info!("audio: mmdevice/IPolicyConfig");
+            return Arc::new(win);
+        }
+        tracing::info!("audio: MMDevice unavailable; audio follow-through disabled");
+    }
     Arc::new(nosignald::audio::NoopAudio)
+}
+
+fn detect_oracle() -> Arc<dyn FullscreenOracle> {
+    #[cfg(target_os = "windows")]
+    {
+        return Arc::new(nosignald::fullscreen::WindowsOracle);
+    }
+    #[allow(unreachable_code)]
+    Arc::new(nosignald::fullscreen::NoopOracle)
 }

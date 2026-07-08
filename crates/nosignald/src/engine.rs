@@ -4,6 +4,7 @@
 
 use crate::audio::AudioController;
 use crate::config::DaemonConfig;
+use crate::fullscreen::FullscreenOracle;
 use crate::state::{AudioRestore, DaemonState, PersistedPending};
 use nosignal_core::{
     ApplyMode, BackendError, DisplayBackend, LayoutPlan, Output, PlannedOutput, ResolveError,
@@ -96,6 +97,7 @@ struct EngineState {
 pub struct Engine {
     backend: Arc<dyn DisplayBackend>,
     audio: Arc<dyn AudioController>,
+    oracle: Arc<dyn FullscreenOracle>,
     paths: EnginePaths,
     st: Mutex<EngineState>,
     events: broadcast::Sender<DaemonEvent>,
@@ -111,6 +113,20 @@ impl Engine {
         audio: Arc<dyn AudioController>,
         paths: EnginePaths,
     ) -> Arc<Self> {
+        Self::with_oracle(
+            backend,
+            audio,
+            Arc::new(crate::fullscreen::NoopOracle),
+            paths,
+        )
+    }
+
+    pub fn with_oracle(
+        backend: Arc<dyn DisplayBackend>,
+        audio: Arc<dyn AudioController>,
+        oracle: Arc<dyn FullscreenOracle>,
+        paths: EnginePaths,
+    ) -> Arc<Self> {
         let config = DaemonConfig::load(&paths.config);
         let profiles =
             nosignal_core::profile::ProfileStore::load(&paths.profiles).unwrap_or_default();
@@ -120,6 +136,7 @@ impl Engine {
         Arc::new(Self {
             backend,
             audio,
+            oracle,
             paths,
             st: Mutex::new(EngineState {
                 config,
@@ -186,6 +203,16 @@ impl Engine {
         let want = enabled.unwrap_or(!output.enabled);
         if output.enabled == want {
             return Ok(SetOutcome::AlreadyInState);
+        }
+
+        // Fullscreen warn-and-defer (E11): real detection on Windows/X11,
+        // documented as unavailable on Wayland (auto-revert is the net there).
+        if !want && !opts.force && self.oracle.fullscreen_active() {
+            return Ok(SetOutcome::GuardRefused {
+                reason: "a fullscreen application appears to be running; \
+                         acknowledge with force to disable anyway"
+                    .into(),
+            });
         }
 
         let mut plan = LayoutPlan::from_topology(&topo);
