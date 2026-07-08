@@ -54,25 +54,6 @@ impl DbusClient {
             .map_err(|e| IpcError::Unreachable(e.to_string()))?;
         Ok(Self { proxy })
     }
-
-    /// Subscribe to daemon events (used by the GUI/tray).
-    ///
-    /// Note: the zbus proxy macro generates a `DaemonEvent` args struct for
-    /// the signal, so the wire type is referenced by full path here.
-    pub async fn events(
-        &self,
-    ) -> Result<impl futures::Stream<Item = crate::types::DaemonEvent> + use<>, IpcError> {
-        use futures::StreamExt;
-        let stream = self
-            .proxy
-            .receive_daemon_event()
-            .await
-            .map_err(|e| IpcError::Unreachable(e.to_string()))?;
-        Ok(stream.filter_map(|signal| async move {
-            let args = signal.args().ok()?;
-            serde_json::from_str::<crate::types::DaemonEvent>(&args.payload_json).ok()
-        }))
-    }
 }
 
 fn decode<T: DeserializeOwned>(raw: zbus::Result<String>) -> Result<T, IpcError> {
@@ -95,6 +76,25 @@ fn map_zbus_err(e: zbus::Error) -> IpcError {
 
 #[async_trait]
 impl DaemonClient for DbusClient {
+    /// Note: the zbus proxy macro generates a `DaemonEvent` args struct for
+    /// the signal, so the wire type is referenced by full path here.
+    async fn events(
+        &self,
+    ) -> Result<futures::stream::BoxStream<'static, crate::types::DaemonEvent>, IpcError> {
+        use futures::StreamExt;
+        let stream = self
+            .proxy
+            .receive_daemon_event()
+            .await
+            .map_err(|e| IpcError::Unreachable(e.to_string()))?;
+        Ok(stream
+            .filter_map(|signal| async move {
+                let args = signal.args().ok()?;
+                serde_json::from_str::<crate::types::DaemonEvent>(&args.payload_json).ok()
+            })
+            .boxed())
+    }
+
     async fn list_outputs(&self) -> Result<Topology, IpcError> {
         decode(self.proxy.list_outputs().await)
     }

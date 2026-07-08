@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "gui",
+  "productName": "NoSignal",
   "version": "0.1.0",
-  "identifier": "org.nosignal.placeholder",
+  "identifier": "org.nosignal.NoSignal",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,9 +12,12 @@
   "app": {
     "windows": [
       {
-        "title": "gui",
-        "width": 800,
-        "height": 600
+        "label": "main",
+        "title": "NoSignal",
+        "width": 1000,
+        "height": 660,
+        "minWidth": 720,
+        "minHeight": 480
       }
     ],
     "security": {

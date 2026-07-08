@@ -31,6 +31,10 @@ pub enum IpcError {
 /// Client-side view of the daemon API. One implementation per transport.
 #[async_trait]
 pub trait DaemonClient: Send + Sync {
+    /// Subscribe to daemon events (GUI/tray refresh signal).
+    async fn events(
+        &self,
+    ) -> Result<futures::stream::BoxStream<'static, types::DaemonEvent>, IpcError>;
     async fn list_outputs(&self) -> Result<nosignal_core::Topology, IpcError>;
     async fn set_output_enabled(
         &self,

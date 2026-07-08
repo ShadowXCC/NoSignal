@@ -61,6 +61,9 @@ async fn main() {
         }
     };
 
+    #[cfg(target_os = "linux")]
+    tokio::spawn(nosignald::hotkeys::run(engine.clone()));
+
     let run = tokio::spawn(engine.clone().run());
 
     tokio::select! {

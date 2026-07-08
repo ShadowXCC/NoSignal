@@ -346,6 +346,98 @@ async fn revert_flow(
     Ok(())
 }
 
+// ------------------------------------------------------ hotkeys fallback
+
+/// GNOME custom-keybinding fallback for environments without the
+/// GlobalShortcuts portal: writes gsettings entries invoking this CLI.
+pub mod hotkeys {
+    use super::*;
+    use nosignal_core::profile::ProfileStore;
+    use std::process::Command;
+
+    const SCHEMA: &str = "org.gnome.settings-daemon.plugins.media-keys";
+    const LIST_KEY: &str = "custom-keybindings";
+
+    fn gsettings(args: &[&str]) -> Result<String, CliError> {
+        let out = Command::new("gsettings")
+            .args(args)
+            .output()
+            .map_err(|e| CliError::Other(format!("gsettings not runnable: {e}")))?;
+        if !out.status.success() {
+            return Err(CliError::Other(format!(
+                "gsettings {}: {}",
+                args.join(" "),
+                String::from_utf8_lossy(&out.stderr).trim()
+            )));
+        }
+        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+    }
+
+    fn parse_list(raw: &str) -> Vec<String> {
+        raw.trim_start_matches("@as")
+            .trim()
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .split(',')
+            .map(|s| s.trim().trim_matches('\'').to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
+
+    pub async fn install() -> Result<(), CliError> {
+        let store = ProfileStore::load(&paths::profiles_path())
+            .map_err(|e| CliError::Other(e.to_string()))?;
+        let bindings: Vec<(&str, &str)> = store
+            .profiles
+            .iter()
+            .filter_map(|p| p.hotkey.as_deref().map(|h| (p.name.as_str(), h)))
+            .collect();
+        if bindings.is_empty() {
+            println!("no profiles with hotkeys; set `hotkey` on a profile first");
+            return Ok(());
+        }
+
+        let mut list = parse_list(&gsettings(&["get", SCHEMA, LIST_KEY])?);
+        for (name, hotkey) in &bindings {
+            let slug: String = name
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+                .collect();
+            let path = format!(
+                "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/nosignal-{slug}/"
+            );
+            let schema_path = format!("{SCHEMA}.custom-keybinding:{path}");
+            gsettings(&[
+                "set",
+                &schema_path,
+                "name",
+                &format!("NoSignal: apply profile {name}"),
+            ])?;
+            gsettings(&[
+                "set",
+                &schema_path,
+                "command",
+                &format!("nosignal profile apply {name}"),
+            ])?;
+            gsettings(&["set", &schema_path, "binding", hotkey])?;
+            if !list.contains(&path) {
+                list.push(path);
+            }
+            println!("bound {hotkey} -> profile '{name}'");
+        }
+        let serialized = format!(
+            "[{}]",
+            list.iter()
+                .map(|p| format!("'{p}'"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        gsettings(&["set", SCHEMA, LIST_KEY, &serialized])?;
+        println!("installed {} GNOME keybinding(s)", bindings.len());
+        Ok(())
+    }
+}
+
 // -------------------------------------------------- direct-mode profiles
 
 /// Direct-mode profile operations work on the same files the daemon uses;

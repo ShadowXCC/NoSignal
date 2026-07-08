@@ -17,5 +17,7 @@ pub mod state;
 
 #[cfg(target_os = "linux")]
 pub mod dbus;
+#[cfg(target_os = "linux")]
+pub mod hotkeys;
 #[cfg(target_os = "windows")]
 pub mod pipe;

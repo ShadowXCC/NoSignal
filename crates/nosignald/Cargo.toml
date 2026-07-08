@@ -32,6 +32,7 @@ nosignal-backend-kde = { workspace = true }
 nosignal-backend-wlroots = { workspace = true }
 nosignal-backend-x11 = { workspace = true }
 zbus = { workspace = true }
+ashpd = { version = "0.13", default-features = false, features = ["tokio", "global_shortcuts"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 nosignal-backend-win = { workspace = true }

@@ -79,6 +79,11 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// Hotkey helpers
+    Hotkeys {
+        #[command(subcommand)]
+        cmd: HotkeysCmd,
+    },
     /// Control the daemon process
     Daemon {
         #[command(subcommand)]
@@ -96,6 +101,13 @@ enum ProfileCmd {
     Save { name: String },
     /// Delete a profile
     Delete { name: String },
+}
+
+#[derive(Subcommand)]
+enum HotkeysCmd {
+    /// Write GNOME custom keybindings that invoke this CLI (portal-free
+    /// fallback; the daemon binds hotkeys via the desktop portal otherwise)
+    Install,
 }
 
 #[derive(Subcommand)]
@@ -243,6 +255,10 @@ async fn run(cli: Cli) -> Result<(), ops::CliError> {
 
         (Cmd::Status { json }, Some(c)) => client::status(c.as_ref(), json).await,
         (Cmd::Status { json }, None) => ops::status(json).await,
+
+        (Cmd::Hotkeys { cmd }, _) => match cmd {
+            HotkeysCmd::Install => ops::hotkeys::install().await,
+        },
 
         (Cmd::Daemon { .. }, _) => unreachable!("handled above"),
     }

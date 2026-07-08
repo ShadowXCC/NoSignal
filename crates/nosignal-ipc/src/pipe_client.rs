@@ -66,6 +66,45 @@ impl PipeClient {
 
 #[async_trait]
 impl DaemonClient for PipeClient {
+    /// Events use their own pipe connection switched into subscribe mode.
+    async fn events(&self) -> Result<futures::stream::BoxStream<'static, DaemonEvent>, IpcError> {
+        use futures::StreamExt;
+        let pipe = ClientOptions::new()
+            .open(nosignal_core::PIPE_NAME)
+            .map_err(|e| IpcError::Unreachable(format!("daemon pipe: {e}")))?;
+        let (read, mut write) = tokio::io::split(pipe);
+        write
+            .write_all(b"{\"id\":0,\"method\":\"subscribe\"}\n")
+            .await
+            .map_err(|e| IpcError::Unreachable(format!("pipe write: {e}")))?;
+        let mut reader = BufReader::new(read);
+        // Consume the ack line.
+        let mut ack = String::new();
+        reader
+            .read_line(&mut ack)
+            .await
+            .map_err(|e| IpcError::Unreachable(format!("pipe read: {e}")))?;
+
+        let stream = futures::stream::unfold((reader, write), |(mut reader, write)| async move {
+            loop {
+                let mut line = String::new();
+                match reader.read_line(&mut line).await {
+                    Ok(0) | Err(_) => return None,
+                    Ok(_) => {
+                        let event = serde_json::from_str::<serde_json::Value>(&line)
+                            .ok()
+                            .and_then(|v| v.get("event").cloned())
+                            .and_then(|e| serde_json::from_value::<DaemonEvent>(e).ok());
+                        if let Some(event) = event {
+                            return Some((event, (reader, write)));
+                        }
+                    }
+                }
+            }
+        });
+        Ok(stream.boxed())
+    }
+
     async fn list_outputs(&self) -> Result<Topology, IpcError> {
         self.call("list_outputs", serde_json::json!({})).await
     }
