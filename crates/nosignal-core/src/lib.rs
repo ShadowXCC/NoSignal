@@ -6,6 +6,7 @@
 //! all state and orchestration lives in the `nosignald` daemon.
 
 pub mod backend;
+pub mod edid;
 pub mod error;
 pub mod guards;
 pub mod identity;

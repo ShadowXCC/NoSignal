@@ -23,9 +23,9 @@ Every OS *can* deactivate a display, but the experience is buried, inconsistent,
 | Platform | Backend | Status |
 |---|---|---|
 | Linux / GNOME (Wayland & X11) | Mutter DisplayConfig DBus | CLI + daemon working (GUI in progress) |
-| Linux / KDE Plasma | KScreen | planned (v1) |
-| Linux / wlroots (Sway, Hyprland, …) | `zwlr_output_manager_v1` | planned (v1) |
-| Linux / other X11 (XFCE, MATE, Cinnamon, …) | RandR | planned (v1) |
+| Linux / KDE Plasma | KScreen (`kscreen-doctor`) | implemented — community-tested |
+| Linux / wlroots (Sway, Hyprland, …) | `zwlr_output_manager_v1` | implemented — community-tested |
+| Linux / other X11 (XFCE, MATE, Cinnamon, …) | RandR | implemented — community-tested |
 | Windows 10/11 | CCD API | planned (v1) |
 | macOS | — | open for a contributor (see [CONTRIBUTING](CONTRIBUTING.md)) |
 

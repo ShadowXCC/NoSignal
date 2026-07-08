@@ -28,6 +28,9 @@ directories = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 nosignal-backend-gnome = { workspace = true }
+nosignal-backend-kde = { workspace = true }
+nosignal-backend-wlroots = { workspace = true }
+nosignal-backend-x11 = { workspace = true }
 zbus = { workspace = true }
 
 [dev-dependencies]
