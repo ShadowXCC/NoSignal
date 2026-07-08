@@ -1,0 +1,13 @@
+# packaging/
+
+System integration files bundled into the Linux packages by `release.yml`.
+
+| File | Purpose | Lands in package at |
+|---|---|---|
+| `nosignal-daemon.service` | systemd user unit for `nosignald` | `/usr/lib/systemd/user/` |
+| `99-nosignal-i2c.rules` | udev rule for the opt-in DDC/CI feature | `/usr/lib/udev/rules.d/` |
+| `nosignal.desktop` | desktop entry for the GUI | `/usr/share/applications/` |
+
+Still to come (M2+): DBus service activation file (`<APP_ID>.service`) so any client can autostart the daemon, and icons.
+
+Post-install behavior: packages print (but never force) `systemctl --user enable --now nosignal-daemon`.

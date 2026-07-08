@@ -1,0 +1,1 @@
+When adding a new feature, update the README

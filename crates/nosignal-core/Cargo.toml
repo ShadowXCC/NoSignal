@@ -1,0 +1,10 @@
+[package]
+name = "nosignal-core"
+description = "Core types, backend trait, display identity matching, and profile schema for NoSignal."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]

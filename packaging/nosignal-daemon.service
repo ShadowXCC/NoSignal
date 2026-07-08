@@ -1,0 +1,21 @@
+# NoSignal daemon — systemd user unit.
+# Installed by the .deb/.rpm to /usr/lib/systemd/user/.
+# Enable with: systemctl --user enable --now nosignal-daemon
+#
+# TODO(identity): BusName below uses the placeholder namespace; it is finalized
+# together with nosignal-core::APP_ID at repository creation.
+
+[Unit]
+Description=NoSignal display daemon
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=org.nosignal.Daemon1
+ExecStart=/usr/bin/nosignald
+Restart=on-failure
+Slice=background.slice
+
+[Install]
+WantedBy=graphical-session.target

@@ -1,0 +1,6 @@
+# udev rule for NoSignal's opt-in DDC/CI feature (instant monitor standby).
+# Grants the active local user access to i2c devices via the uaccess tag,
+# with the i2c group as a fallback for systems without systemd-logind seats.
+# Only needed if you enable DDC/CI power control; output deactivation itself
+# requires no special permissions.
+KERNEL=="i2c-[0-9]*", TAG+="uaccess", GROUP="i2c", MODE="0660"

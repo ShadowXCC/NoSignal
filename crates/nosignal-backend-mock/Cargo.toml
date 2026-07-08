@@ -1,0 +1,10 @@
+[package]
+name = "nosignal-backend-mock"
+description = "In-memory mock display backend used for headless testing of NoSignal."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]

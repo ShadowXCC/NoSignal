@@ -1,0 +1,19 @@
+# Rust
+/target/
+crates/**/target/
+
+# Node / GUI
+gui/node_modules/
+gui/build/
+gui/src-tauri/target/
+gui/.svelte-kit/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Owner's local research notes (not part of the project)
+/Future Plans.md
+/One Shot Working File.md

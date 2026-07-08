@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=NoSignal
+GenericName=Display Power Manager
+Comment=Software unplug for displays — turn monitors and TVs off as if disconnected
+Exec=nosignal-gui
+Icon=nosignal
+Type=Application
+Terminal=false
+Categories=Settings;HardwareSettings;
+Keywords=monitor;display;screen;disable;output;tv;

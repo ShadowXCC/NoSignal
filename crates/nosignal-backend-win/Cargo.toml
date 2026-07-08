@@ -1,0 +1,10 @@
+[package]
+name = "nosignal-backend-win"
+description = "Windows display backend for NoSignal, via the CCD (Connecting and Configuring Displays) API."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]

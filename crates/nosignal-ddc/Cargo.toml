@@ -1,0 +1,10 @@
+[package]
+name = "nosignal-ddc"
+description = "Opt-in DDC/CI monitor power control (VCP 0xD6) for NoSignal."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]

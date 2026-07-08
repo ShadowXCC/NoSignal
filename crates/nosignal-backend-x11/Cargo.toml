@@ -1,0 +1,10 @@
+[package]
+name = "nosignal-backend-x11"
+description = "X11 display backend for NoSignal, via the RandR extension."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]

@@ -1,0 +1,10 @@
+[package]
+name = "nosignal-backend-gnome"
+description = "GNOME display backend for NoSignal, via the org.gnome.Mutter.DisplayConfig DBus API."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]

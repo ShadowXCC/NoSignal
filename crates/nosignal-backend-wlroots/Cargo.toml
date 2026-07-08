@@ -1,0 +1,10 @@
+[package]
+name = "nosignal-backend-wlroots"
+description = "wlroots display backend for NoSignal, via the zwlr_output_manager_v1 Wayland protocol."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
