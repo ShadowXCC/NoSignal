@@ -27,6 +27,23 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "externalBin": ["binaries/nosignald", "binaries/nosignal"],
+    "linux": {
+      "deb": {
+        "files": {
+          "/usr/lib/systemd/user/nosignal-daemon.service": "../../packaging/nosignal-daemon.service",
+          "/usr/share/dbus-1/services/org.nosignal.Daemon1.service": "../../packaging/org.nosignal.Daemon1.service",
+          "/usr/lib/udev/rules.d/99-nosignal-i2c.rules": "../../packaging/99-nosignal-i2c.rules"
+        }
+      },
+      "rpm": {
+        "files": {
+          "/usr/lib/systemd/user/nosignal-daemon.service": "../../packaging/nosignal-daemon.service",
+          "/usr/share/dbus-1/services/org.nosignal.Daemon1.service": "../../packaging/org.nosignal.Daemon1.service",
+          "/usr/lib/udev/rules.d/99-nosignal-i2c.rules": "../../packaging/99-nosignal-i2c.rules"
+        }
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

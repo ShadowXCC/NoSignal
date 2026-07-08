@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    name: Bundle (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04 # oldest supported runner = lowest glibc floor
+            triple: x86_64-unknown-linux-gnu
+            ext: ""
+          - os: windows-latest
+            triple: x86_64-pc-windows-msvc
+            ext: ".exe"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf libudev-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gui/package-lock.json
+      - run: npm ci
+        working-directory: gui
+
+      - name: Build daemon + CLI sidecars
+        run: cargo build --release -p nosignald -p nosignal-cli
+
+      - name: Stage sidecars for bundling
+        shell: bash
+        run: |
+          mkdir -p gui/src-tauri/binaries
+          cp "target/release/nosignald${{ matrix.ext }}" \
+             "gui/src-tauri/binaries/nosignald-${{ matrix.triple }}${{ matrix.ext }}"
+          cp "target/release/nosignal${{ matrix.ext }}" \
+             "gui/src-tauri/binaries/nosignal-${{ matrix.triple }}${{ matrix.ext }}"
+
+      # Builds the Tauri app, bundles installers (.deb/.rpm/AppImage on
+      # Linux; .msi + NSIS .exe on Windows) and attaches everything to a
+      # DRAFT GitHub release — publishing stays a manual decision.
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: gui
+          tagName: ${{ github.ref_name }}
+          releaseName: "NoSignal ${{ github.ref_name }}"
+          releaseDraft: true
+          releaseBody: |
+            > Windows binaries are not code-signed yet; SmartScreen will warn.
+            > See the README for per-platform notes.

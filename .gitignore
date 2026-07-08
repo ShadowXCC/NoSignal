@@ -6,6 +6,8 @@ crates/**/target/
 gui/node_modules/
 gui/build/
 gui/src-tauri/target/
+gui/src-tauri/binaries/
+gui/src-tauri/gen/
 gui/.svelte-kit/
 
 # Editor / OS

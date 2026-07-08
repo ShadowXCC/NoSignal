@@ -2,7 +2,7 @@
 
 **Software "unplug" for your displays.** Turn any connected monitor or TV off in software so it behaves as if the cable were pulled — the desktop shrinks, windows migrate, the cursor is fenced, and the display drops to standby on its own — then bring it back on demand with its exact layout restored.
 
-> **Status: pre-release scaffold.** Nothing here is usable yet; the project is under active initial development. Watch the releases page.
+> **Status: pre-release.** Feature-complete for v1 on Linux (GNOME tested; KDE/wlroots/X11 community-tested) with the Windows backend awaiting on-hardware validation. Expect rough edges until the first tagged release.
 
 ## Why
 
@@ -28,6 +28,36 @@ Every OS *can* deactivate a display, but the experience is buried, inconsistent,
 | Linux / other X11 (XFCE, MATE, Cinnamon, …) | RandR | implemented — community-tested |
 | Windows 10/11 | CCD API | implemented — needs on-hardware validation |
 | macOS | — | open for a contributor (see [CONTRIBUTING](CONTRIBUTING.md)) |
+
+## Usage
+
+```sh
+nosignal list                      # outputs with identity and state
+nosignal alias TV HDMI-A-1        # name a display
+nosignal off tv                    # software-unplug it (alias, connector, or EDID substring)
+nosignal on tv                     # back, with its exact layout restored
+nosignal toggle tv --timer 20      # arm a 20s auto-revert (mandatory for risky changes)
+nosignal confirm | revert          # resolve a pending change
+nosignal profile save movie       # capture the current layout
+nosignal profile apply movie      # hot-switch; the daemon keeps re-asserting it
+nosignal status --json             # scripting-friendly everywhere
+nosignal ddc probe tv              # test DDC/CI instant standby, then: ddc opt-in
+nosignal daemon status|start|stop|logs
+```
+
+The daemon (`nosignald`) owns all state; the CLI falls back to `--direct` mode when it isn't running (SSH rescue: `nosignal --direct on eDP-1`). Automation on Linux goes through the DBus API (`org.nosignal.Daemon1`, JSON payloads) or `nosignal ... --json`.
+
+## Building from source
+
+```sh
+# daemon + CLI (no GUI system deps needed)
+cargo build --release -p nosignald -p nosignal-cli
+
+# GUI (needs the Tauri v2 Linux prerequisites: webkit2gtk-4.1, gtk3, …)
+cd gui && npm ci && npm run tauri build
+```
+
+Linux packages also want `libudev-dev` at build time (DDC/CI enumeration). Enable the daemon at login with `systemctl --user enable --now nosignal-daemon` (packages install the unit; the DBus service file makes the daemon auto-start on first use regardless).
 
 ## Known physical-layer realities
 
