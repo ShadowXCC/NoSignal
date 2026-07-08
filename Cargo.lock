@@ -563,6 +563,7 @@ dependencies = [
  "clap",
  "futures",
  "nosignal-core",
+ "nosignal-ipc",
  "nosignald",
  "serde_json",
  "tokio",
@@ -586,6 +587,15 @@ version = "0.1.0"
 [[package]]
 name = "nosignal-ipc"
 version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "nosignal-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "zbus",
+]
 
 [[package]]
 name = "nosignald"
@@ -597,10 +607,15 @@ dependencies = [
  "nosignal-backend-gnome",
  "nosignal-backend-mock",
  "nosignal-core",
+ "nosignal-ipc",
+ "serde",
  "serde_json",
+ "thiserror",
  "tokio",
+ "toml",
  "tracing",
  "tracing-subscriber",
+ "zbus",
 ]
 
 [[package]]

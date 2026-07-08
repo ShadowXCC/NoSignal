@@ -5,6 +5,13 @@
 //! direct mode reuses [`select::detect`] so terminal use works without a
 //! running daemon.
 
+pub mod audio;
+pub mod config;
+pub mod engine;
 pub mod mock_file;
 pub mod paths;
 pub mod select;
+pub mod state;
+
+#[cfg(target_os = "linux")]
+pub mod dbus;

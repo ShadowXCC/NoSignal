@@ -13,10 +13,14 @@ path = "src/main.rs"
 
 [dependencies]
 nosignal-core = { workspace = true }
+nosignal-ipc = { workspace = true }
 nosignal-backend-mock = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -24,3 +28,7 @@ directories = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 nosignal-backend-gnome = { workspace = true }
+zbus = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

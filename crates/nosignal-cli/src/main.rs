@@ -1,11 +1,12 @@
 //! `nosignal` — command-line client.
 //!
-//! M1 operates directly on the display backend; once the daemon lands (M2)
-//! the CLI becomes a thin IPC client and direct mode stays available behind
-//! `--direct` for daemon-less use (SSH rescue, scripting, debugging).
+//! Talks to the daemon over IPC when it is running (or DBus-activatable);
+//! falls back to driving the display backend directly — `--direct` forces
+//! that (daemon-less scripting, SSH rescue).
 //!
 //! Exit codes: 0 ok · 1 error · 2 ambiguous target · 3 guarded action refused.
 
+mod client;
 mod ops;
 
 use clap::{Args, Parser, Subcommand};
@@ -17,6 +18,9 @@ use clap::{Args, Parser, Subcommand};
     about = "Software unplug for displays: disable outputs as if the cable were pulled"
 )]
 struct Cli {
+    /// Bypass the daemon and drive the display backend directly
+    #[arg(long, global = true)]
+    direct: bool,
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -58,44 +62,259 @@ enum Cmd {
         #[command(flatten)]
         flags: ToggleFlags,
     },
-    /// Show backend and output summary
+    /// Confirm the pending change (keep it)
+    Confirm,
+    /// Revert the pending change now
+    Revert,
+    /// Manage saved layouts
+    Profile {
+        #[command(subcommand)]
+        cmd: ProfileCmd,
+    },
+    /// Name an output (e.g. `nosignal alias TV HDMI-A-1`)
+    Alias { name: String, target: String },
+    /// Show daemon/backend status
     Status {
         /// Machine-readable output
         #[arg(long)]
         json: bool,
     },
+    /// Control the daemon process
+    Daemon {
+        #[command(subcommand)]
+        cmd: DaemonCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum ProfileCmd {
+    /// List saved profiles
+    List,
+    /// Apply a profile (sets it active; the daemon keeps re-asserting it)
+    Apply { name: String },
+    /// Capture the current layout as a profile
+    Save { name: String },
+    /// Delete a profile
+    Delete { name: String },
+}
+
+#[derive(Subcommand)]
+enum DaemonCmd {
+    /// Show daemon status
+    Status,
+    /// Start the daemon (systemd unit if installed, else spawn)
+    Start,
+    /// Ask the daemon to exit
+    Stop,
+    /// Show recent daemon logs (journalctl)
+    Logs,
 }
 
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
-    let result = match cli.cmd {
-        Cmd::List { json } => ops::list(json).await,
-        Cmd::Off { target, flags } => ops::set_enabled(&target, Some(false), flags.into()).await,
-        Cmd::On { target } => {
-            ops::set_enabled(
-                &target,
-                Some(true),
-                ops::ToggleOpts {
-                    force: false,
-                    no_timer: true,
-                    timer: None,
-                },
-            )
-            .await
+    let result = run(cli).await;
+    if let Err(err) = result {
+        eprintln!("error: {err}");
+        if let Some(hint) = err.hint() {
+            eprintln!("hint: {hint}");
         }
-        Cmd::Toggle { target, flags } => ops::set_enabled(&target, None, flags.into()).await,
-        Cmd::Status { json } => ops::status(json).await,
-    };
+        std::process::exit(err.exit_code());
+    }
+}
 
-    match result {
-        Ok(()) => {}
-        Err(err) => {
-            eprintln!("error: {err}");
-            if let Some(hint) = err.hint() {
-                eprintln!("hint: {hint}");
+async fn run(cli: Cli) -> Result<(), ops::CliError> {
+    // Daemon-control commands manage the connection themselves.
+    if let Cmd::Daemon { cmd } = &cli.cmd {
+        return daemon_cmd(cmd).await;
+    }
+
+    let daemon = client::try_connect(cli.direct).await;
+    if daemon.is_none() && !cli.direct {
+        eprintln!("note: daemon not reachable — operating directly on the display backend");
+    }
+
+    match (cli.cmd, daemon) {
+        (Cmd::List { json }, Some(c)) => client::list(c.as_ref(), json).await,
+        (Cmd::List { json }, None) => ops::list(json).await,
+
+        (Cmd::Off { target, flags }, Some(c)) => {
+            client::set_enabled(c.as_ref(), &target, Some(false), flags.into()).await
+        }
+        (Cmd::Off { target, flags }, None) => {
+            ops::set_enabled(&target, Some(false), flags.into()).await
+        }
+
+        (Cmd::On { target }, Some(c)) => {
+            client::set_enabled(c.as_ref(), &target, Some(true), on_flags()).await
+        }
+        (Cmd::On { target }, None) => ops::set_enabled(&target, Some(true), on_flags()).await,
+
+        (Cmd::Toggle { target, flags }, Some(c)) => {
+            client::set_enabled(c.as_ref(), &target, None, flags.into()).await
+        }
+        (Cmd::Toggle { target, flags }, None) => {
+            ops::set_enabled(&target, None, flags.into()).await
+        }
+
+        (Cmd::Confirm, Some(c)) => {
+            if c.confirm_pending().await.map_err(ops::CliError::from)? {
+                println!("kept");
+            } else {
+                println!("nothing pending");
             }
-            std::process::exit(err.exit_code());
+            Ok(())
+        }
+        (Cmd::Confirm, None) | (Cmd::Revert, None) => Err(ops::CliError::Other(
+            "pending changes live in the daemon; it is not running".into(),
+        )),
+        (Cmd::Revert, Some(c)) => {
+            if c.revert_pending().await.map_err(ops::CliError::from)? {
+                println!("reverted");
+            } else {
+                println!("nothing pending");
+            }
+            Ok(())
+        }
+
+        (Cmd::Profile { cmd }, Some(c)) => match cmd {
+            ProfileCmd::List => {
+                let info = c.list_profiles().await.map_err(ops::CliError::from)?;
+                if info.profiles.is_empty() {
+                    println!("no profiles saved");
+                }
+                for p in &info.profiles {
+                    let mut notes = Vec::new();
+                    if p.active {
+                        notes.push("active".to_string());
+                    }
+                    if p.drifted {
+                        notes.push("drifted".to_string());
+                    }
+                    if let Some(h) = &p.hotkey {
+                        notes.push(format!("hotkey: {h}"));
+                    }
+                    if notes.is_empty() {
+                        println!("{}", p.name);
+                    } else {
+                        println!("{} ({})", p.name, notes.join(", "));
+                    }
+                }
+                if info.suspended {
+                    eprintln!(
+                        "warning: active profile suspended by the loop guard; \
+                         re-apply it to resume"
+                    );
+                }
+                Ok(())
+            }
+            ProfileCmd::Apply { name } => client::apply_profile(c.as_ref(), &name).await,
+            ProfileCmd::Save { name } => {
+                c.save_profile(&name).await.map_err(ops::CliError::from)?;
+                println!("profile '{name}' saved");
+                Ok(())
+            }
+            ProfileCmd::Delete { name } => {
+                if c.delete_profile(&name).await.map_err(ops::CliError::from)? {
+                    println!("profile '{name}' deleted");
+                    Ok(())
+                } else {
+                    Err(ops::CliError::Other(format!("no profile named '{name}'")))
+                }
+            }
+        },
+        (Cmd::Profile { cmd }, None) => match cmd {
+            ProfileCmd::List => ops::profile::list().await,
+            ProfileCmd::Apply { name } => ops::profile::apply(&name).await,
+            ProfileCmd::Save { name } => ops::profile::save(&name).await,
+            ProfileCmd::Delete { name } => ops::profile::delete(&name).await,
+        },
+
+        (Cmd::Alias { name, target }, Some(c)) => {
+            c.set_alias(&name, &target)
+                .await
+                .map_err(ops::CliError::from)?;
+            println!("alias '{name}' -> {target}");
+            Ok(())
+        }
+        (Cmd::Alias { .. }, None) => Err(ops::CliError::Other(
+            "alias management needs the daemon (it owns the config)".into(),
+        )),
+
+        (Cmd::Status { json }, Some(c)) => client::status(c.as_ref(), json).await,
+        (Cmd::Status { json }, None) => ops::status(json).await,
+
+        (Cmd::Daemon { .. }, _) => unreachable!("handled above"),
+    }
+}
+
+fn on_flags() -> ops::ToggleOpts {
+    ops::ToggleOpts {
+        force: false,
+        no_timer: true,
+        timer: None,
+    }
+}
+
+async fn daemon_cmd(cmd: &DaemonCmd) -> Result<(), ops::CliError> {
+    match cmd {
+        DaemonCmd::Status => match client::try_connect(false).await {
+            Some(c) => client::status(c.as_ref(), false).await,
+            None => {
+                println!("daemon:   not running");
+                Ok(())
+            }
+        },
+        DaemonCmd::Start => {
+            if client::try_connect(false).await.is_some() {
+                println!("daemon already running");
+                return Ok(());
+            }
+            // Prefer the systemd unit when installed.
+            let unit = std::process::Command::new("systemctl")
+                .args(["--user", "start", "nosignal-daemon"])
+                .status();
+            if matches!(unit, Ok(s) if s.success()) {
+                println!("started via systemd user unit");
+                return Ok(());
+            }
+            // Fall back to spawning next to this binary.
+            let daemon_bin = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.join("nosignald")))
+                .filter(|p| p.exists())
+                .unwrap_or_else(|| "nosignald".into());
+            std::process::Command::new(daemon_bin)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .map_err(|e| ops::CliError::Other(format!("could not spawn nosignald: {e}")))?;
+            println!("daemon spawned");
+            Ok(())
+        }
+        DaemonCmd::Stop => match client::try_connect(false).await {
+            Some(c) => {
+                c.quit().await.map_err(ops::CliError::from)?;
+                println!("daemon stopping");
+                Ok(())
+            }
+            None => {
+                println!("daemon not running");
+                Ok(())
+            }
+        },
+        DaemonCmd::Logs => {
+            let status = std::process::Command::new("journalctl")
+                .args(["--user", "-u", "nosignal-daemon", "-n", "100", "--no-pager"])
+                .status()
+                .map_err(|e| ops::CliError::Other(format!("journalctl: {e}")))?;
+            if !status.success() {
+                eprintln!(
+                    "(no journal for the unit — if the daemon was spawned manually, \
+                     its logs went to its stderr)"
+                );
+            }
+            Ok(())
         }
     }
 }

@@ -8,3 +8,12 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+nosignal-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { workspace = true }

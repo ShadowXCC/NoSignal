@@ -22,6 +22,8 @@ pub enum CliError {
     Guard(String),
     Backend(BackendError),
     Other(String),
+    /// Error with an explicit exit code (IPC-side classification).
+    Other2(i32, String),
 }
 
 impl CliError {
@@ -29,6 +31,7 @@ impl CliError {
         match self {
             CliError::Resolve(ResolveError::Ambiguous { .. }) => 2,
             CliError::Guard(_) => 3,
+            CliError::Other2(code, _) => *code,
             _ => 1,
         }
     }
@@ -55,6 +58,7 @@ impl fmt::Display for CliError {
             CliError::Guard(msg) => write!(f, "{msg}"),
             CliError::Backend(e) => write!(f, "{e}"),
             CliError::Other(msg) => write!(f, "{msg}"),
+            CliError::Other2(_, msg) => write!(f, "{msg}"),
         }
     }
 }
@@ -84,7 +88,19 @@ pub struct ToggleOpts {
 
 pub async fn list(json: bool) -> Result<(), CliError> {
     let backend = select::detect().await?;
-    let topo = backend.snapshot().await?;
+    let mut topo = backend.snapshot().await?;
+    attach_aliases(&mut topo);
+    print_topology(&topo, json)
+}
+
+/// Attach configured aliases in direct mode (the daemon does this itself).
+fn attach_aliases(topo: &mut Topology) {
+    nosignald::config::DaemonConfig::load(&paths::config_dir().join("config.toml"))
+        .attach_aliases(topo);
+}
+
+/// Shared table/JSON printer for both direct and daemon modes.
+pub fn print_topology(topo: &Topology, json: bool) -> Result<(), CliError> {
     if json {
         println!("{}", serde_json::to_string_pretty(&topo)?);
         return Ok(());
@@ -330,7 +346,100 @@ async fn revert_flow(
     Ok(())
 }
 
-async fn confirm_risk() -> bool {
+// -------------------------------------------------- direct-mode profiles
+
+/// Direct-mode profile operations work on the same files the daemon uses;
+/// they exist for daemon-less/rescue use. Persistence re-assert only works
+/// while the daemon runs.
+pub mod profile {
+    use super::*;
+    use nosignal_core::profile::{Profile, ProfileStore};
+
+    fn store_path() -> std::path::PathBuf {
+        paths::profiles_path()
+    }
+
+    pub async fn list() -> Result<(), CliError> {
+        let store =
+            ProfileStore::load(&store_path()).map_err(|e| CliError::Other(e.to_string()))?;
+        if store.profiles.is_empty() {
+            println!("no profiles saved");
+        }
+        for p in &store.profiles {
+            match &p.hotkey {
+                Some(h) => println!("{} (hotkey: {h})", p.name),
+                None => println!("{}", p.name),
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn save(name: &str) -> Result<(), CliError> {
+        let backend = select::detect().await?;
+        let mut topo = backend.snapshot().await?;
+        super::attach_aliases(&mut topo);
+        let mut store =
+            ProfileStore::load(&store_path()).map_err(|e| CliError::Other(e.to_string()))?;
+        store.upsert(Profile::capture(name, &topo));
+        store
+            .save(&store_path())
+            .map_err(|e| CliError::Other(e.to_string()))?;
+        println!("profile '{name}' saved");
+        Ok(())
+    }
+
+    pub async fn apply(name: &str) -> Result<(), CliError> {
+        let backend = select::detect().await?;
+        let topo = backend.snapshot().await?;
+        let store =
+            ProfileStore::load(&store_path()).map_err(|e| CliError::Other(e.to_string()))?;
+        let profile = store
+            .find(name)
+            .ok_or_else(|| CliError::Other(format!("no profile named '{name}'")))?;
+        let (plan, warnings) = profile.to_plan(&topo)?;
+        for w in &warnings {
+            eprintln!("note: {w:?}");
+        }
+
+        let risk = guards::assess(&topo, &plan);
+        if risk != RiskClass::Routine {
+            // Unattended-safe: same policy as the daemon (timer, no prompt).
+            apply_with_rebase(backend.as_ref(), &plan, ApplyMode::Temporary).await?;
+            eprintln!("profile applied temporarily ({risk:?}) — press Enter to keep");
+            if wait_for_enter(DEFAULT_TIMER_SECS).await {
+                let fresh = backend.snapshot().await?;
+                let keep = LayoutPlan::from_topology(&fresh);
+                apply_with_rebase(backend.as_ref(), &keep, ApplyMode::Persistent).await?;
+                println!("kept");
+            } else {
+                let fresh = backend.snapshot().await?;
+                let restore = layout::restore_plan(&fresh, &topo);
+                apply_with_rebase(backend.as_ref(), &restore, ApplyMode::Persistent).await?;
+                println!("reverted");
+            }
+        } else {
+            apply_with_rebase(backend.as_ref(), &plan, ApplyMode::Persistent).await?;
+            println!("profile '{name}' applied");
+        }
+        Ok(())
+    }
+
+    pub async fn delete(name: &str) -> Result<(), CliError> {
+        let mut store =
+            ProfileStore::load(&store_path()).map_err(|e| CliError::Other(e.to_string()))?;
+        if store.remove(name) {
+            store
+                .save(&store_path())
+                .map_err(|e| CliError::Other(e.to_string()))?;
+            println!("profile '{name}' deleted");
+            Ok(())
+        } else {
+            Err(CliError::Other(format!("no profile named '{name}'")))
+        }
+    }
+}
+
+pub async fn confirm_risk() -> bool {
     eprint!("proceed? [y/N] ");
     let mut line = String::new();
     let mut reader = tokio::io::BufReader::new(tokio::io::stdin());
@@ -343,7 +452,7 @@ async fn confirm_risk() -> bool {
 /// Countdown on stderr; true when the user pressed Enter in time. On EOF
 /// (no interactive stdin) the full timeout elapses and we return false —
 /// safe-by-default for scripts that hit a mandatory-timer case.
-async fn wait_for_enter(secs: u64) -> bool {
+pub async fn wait_for_enter(secs: u64) -> bool {
     let mut reader = tokio::io::BufReader::new(tokio::io::stdin());
     let mut line = String::new();
     let mut stdin_open = true;
