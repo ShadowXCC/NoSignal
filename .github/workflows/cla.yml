@@ -23,7 +23,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           path-to-signatures: "signatures/cla.json"
-          # TODO(M0): point at the real repository URL at repo creation.
-          path-to-document: "https://github.com/OWNER/nosignal/blob/main/CLA.md"
+          path-to-document: "https://github.com/ShadowXCC/NoSignal/blob/main/CLA.md"
           branch: "cla-signatures"
           allowlist: "dependabot[bot],*[bot]"

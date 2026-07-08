@@ -20,15 +20,14 @@ pub use error::{BackendError, ResolveError};
 pub use identity::{EdidId, OutputIdentity};
 pub use topology::{LayoutPlan, Mode, Output, PlannedOutput, Topology, Transform};
 
-/// Reverse-DNS application identity.
-///
-/// TODO(identity): placeholder namespace — finalized together with the
-/// repository URL at repo creation. Every identifier must be derived from the
-/// constants below; nothing else in the tree may hard-code the namespace.
-pub const APP_ID: &str = "org.nosignal.NoSignal";
+/// Reverse-DNS application identity. Every identifier must be derived from
+/// the constants below; nothing else in the tree may hard-code the namespace
+/// (the DBus proxy/interface macro literals mirror them and are asserted
+/// equal in tests).
+pub const APP_ID: &str = "io.github.shadowxcc.NoSignal";
 /// DBus well-known name of the daemon (Linux IPC + automation surface).
-pub const DBUS_NAME: &str = "org.nosignal.Daemon1";
+pub const DBUS_NAME: &str = "io.github.shadowxcc.NoSignal.Daemon1";
 /// DBus object path of the daemon.
-pub const DBUS_PATH: &str = "/org/nosignal/Daemon1";
+pub const DBUS_PATH: &str = "/io/github/shadowxcc/NoSignal/Daemon1";
 /// Windows named-pipe path of the daemon.
 pub const PIPE_NAME: &str = r"\\.\pipe\nosignal-daemon";

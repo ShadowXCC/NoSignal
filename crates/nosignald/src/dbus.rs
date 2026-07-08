@@ -1,5 +1,5 @@
 //! DBus service: the Linux IPC surface and the v1 automation hook
-//! (`busctl --user call org.nosignal.Daemon1 ...`).
+//! (`busctl --user call io.github.shadowxcc.NoSignal.Daemon1 ...`).
 //!
 //! Every method returns a JSON [`Envelope`] string so results and typed
 //! errors survive the trip identically on every transport.
@@ -28,7 +28,7 @@ pub struct DaemonIface {
     pub shutdown: Arc<tokio::sync::Notify>,
 }
 
-#[zbus::interface(name = "org.nosignal.Daemon1")]
+#[zbus::interface(name = "io.github.shadowxcc.NoSignal.Daemon1")]
 impl DaemonIface {
     async fn list_outputs(&self) -> String {
         envelope(self.engine.snapshot().await)

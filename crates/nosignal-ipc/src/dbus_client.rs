@@ -14,9 +14,9 @@ use zbus::{Connection, proxy};
 // Interface/name/path literals must match nosignal_core::{DBUS_NAME, DBUS_PATH}
 // (asserted in tests below; proxy attributes need literals).
 #[proxy(
-    interface = "org.nosignal.Daemon1",
-    default_service = "org.nosignal.Daemon1",
-    default_path = "/org/nosignal/Daemon1"
+    interface = "io.github.shadowxcc.NoSignal.Daemon1",
+    default_service = "io.github.shadowxcc.NoSignal.Daemon1",
+    default_path = "/io/github/shadowxcc/NoSignal/Daemon1"
 )]
 trait Daemon {
     fn list_outputs(&self) -> zbus::Result<String>;
@@ -164,7 +164,13 @@ impl DaemonClient for DbusClient {
 mod tests {
     #[test]
     fn proxy_literals_match_core_constants() {
-        assert_eq!(nosignal_core::DBUS_NAME, "org.nosignal.Daemon1");
-        assert_eq!(nosignal_core::DBUS_PATH, "/org/nosignal/Daemon1");
+        assert_eq!(
+            nosignal_core::DBUS_NAME,
+            "io.github.shadowxcc.NoSignal.Daemon1"
+        );
+        assert_eq!(
+            nosignal_core::DBUS_PATH,
+            "/io/github/shadowxcc/NoSignal/Daemon1"
+        );
     }
 }

@@ -10,7 +10,7 @@ Every OS *can* deactivate a display, but the experience is buried, inconsistent,
 
 ## Features (v1 targets)
 
-- **Flip the switch from anywhere:** GUI window (optionally retreating to a tray icon), tray menu, global hotkeys, CLI (`nosignal off tv`), and scriptable IPC — on Linux the daemon's DBus API (`org.nosignal.Daemon1`, JSON payloads) is the automation hook, `busctl`/`gdbus`-friendly.
+- **Flip the switch from anywhere:** GUI window (optionally retreating to a tray icon), tray menu, global hotkeys, CLI (`nosignal off tv`), and scriptable IPC — on Linux the daemon's DBus API (`io.github.shadowxcc.NoSignal.Daemon1`, JSON payloads) is the automation hook, `busctl`/`gdbus`-friendly.
 - **Profiles** storing full display layouts (on/off, mode, position, scale, rotation, primary), hot-switchable via hotkey, tray, or GUI.
 - **Persistence:** a background daemon re-asserts "this display stays off" after reboots, re-logins, hotplug events, KVM switches, and monitor power-cycles.
 - **Robust display identity:** displays are matched by EDID first (survives replugging into a different port), connector name as fallback, with explicit warnings on ambiguity — never a guess.
@@ -22,7 +22,7 @@ Every OS *can* deactivate a display, but the experience is buried, inconsistent,
 
 | Platform | Backend | Status |
 |---|---|---|
-| Linux / GNOME (Wayland & X11) | Mutter DisplayConfig DBus | CLI + daemon working (GUI in progress) |
+| Linux / GNOME (Wayland & X11) | Mutter DisplayConfig DBus | working — maintainer-tested |
 | Linux / KDE Plasma | KScreen (`kscreen-doctor`) | implemented — community-tested |
 | Linux / wlroots (Sway, Hyprland, …) | `zwlr_output_manager_v1` | implemented — community-tested |
 | Linux / other X11 (XFCE, MATE, Cinnamon, …) | RandR | implemented — community-tested |
@@ -45,7 +45,7 @@ nosignal ddc probe tv              # test DDC/CI instant standby, then: ddc opt-
 nosignal daemon status|start|stop|logs
 ```
 
-The daemon (`nosignald`) owns all state; the CLI falls back to `--direct` mode when it isn't running (SSH rescue: `nosignal --direct on eDP-1`). Automation on Linux goes through the DBus API (`org.nosignal.Daemon1`, JSON payloads) or `nosignal ... --json`.
+The daemon (`nosignald`) owns all state; the CLI falls back to `--direct` mode when it isn't running (SSH rescue: `nosignal --direct on eDP-1`). Automation on Linux goes through the DBus API (`io.github.shadowxcc.NoSignal.Daemon1`, JSON payloads) or `nosignal ... --json`.
 
 ## Building from source
 

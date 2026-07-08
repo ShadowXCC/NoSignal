@@ -96,7 +96,7 @@
   <p class="muted">
     The revert-timer default (20 s) and output aliases live in the daemon
     config (<code>~/.config/nosignal/config.toml</code> on Linux). Automation:
-    the daemon's DBus API <code>org.nosignal.Daemon1</code> or
+    the daemon's DBus API <code>io.github.shadowxcc.NoSignal.Daemon1</code> or
     <code>nosignal --json</code>.
   </p>
 </section>

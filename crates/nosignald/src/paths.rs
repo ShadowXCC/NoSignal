@@ -4,9 +4,9 @@ use directories::ProjectDirs;
 use std::path::PathBuf;
 
 fn project_dirs() -> ProjectDirs {
-    // Qualifier/org fields mirror nosignal_core::APP_ID (placeholder until
-    // repo creation); only the app name leaks into visible paths.
-    ProjectDirs::from("org", "nosignal", "nosignal").expect("no home directory")
+    // Only the app name shows in user-visible paths (~/.config/nosignal);
+    // qualifier/org matter on Windows/macOS layouts.
+    ProjectDirs::from("io.github", "shadowxcc", "nosignal").expect("no home directory")
 }
 
 /// Config dir: profiles, settings. `~/.config/nosignal/` on Linux.

@@ -9,8 +9,7 @@ exclude = ["gui/src-tauri"]
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-only"
-# TODO(M0): replace with the real repository URL at repo creation.
-repository = "https://github.com/OWNER/nosignal"
+repository = "https://github.com/ShadowXCC/NoSignal"
 rust-version = "1.88"
 
 [workspace.dependencies]

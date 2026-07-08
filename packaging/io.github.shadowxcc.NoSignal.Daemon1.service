@@ -2,10 +2,8 @@
 # name starts the daemon automatically.
 # Installed by the .deb/.rpm to /usr/share/dbus-1/services/.
 #
-# TODO(identity): placeholder namespace; finalized with nosignal-core::APP_ID
-# at repository creation (this file must be renamed to match).
 
 [D-BUS Service]
-Name=org.nosignal.Daemon1
+Name=io.github.shadowxcc.NoSignal.Daemon1
 Exec=/usr/bin/nosignald
 SystemdService=nosignal-daemon.service
